@@ -1,0 +1,13 @@
+# Derleme dosyaları
+*.pyc
+__pycache__/
+
+# Dataset veya büyük klasör
+dataset/
+*.mp4
+*.log
+*.csv
+
+# IDE ve sistem dosyaları
+.vscode/
+.DS_Store
