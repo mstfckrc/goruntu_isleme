@@ -11,3 +11,5 @@ dataset/
 # IDE ve sistem dosyaları
 .vscode/
 .DS_Store
+
+.venv/
