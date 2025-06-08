@@ -226,6 +226,7 @@ class LiveSpeakerTracker:
         cap.release()
         cv2.destroyAllWindows()
 
+
         print("\nKonuşma Süreleri:")
         for name, duration in self.speaking_times.items():
             print(f"{name}: {int(duration)} saniye")
