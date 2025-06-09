@@ -1,15 +1,57 @@
-# Derleme dosyaları
-*.pyc
+# ✅ Python derleme dosyaları
 __pycache__/
+*.py[cod]
+*.pyo
 
-# Dataset veya büyük klasör
-dataset/
-*.mp4
-*.log
-*.csv
-
-# IDE ve sistem dosyaları
-.vscode/
-.DS_Store
-
+# ✅ Sanal ortam
 .venv/
+env/
+venv/
+
+# ✅ Jupyter notebook cache
+.ipynb_checkpoints/
+
+# ✅ Dataset, medya ve eğitim çıktıları
+dataset/
+data/
+*.csv
+*.log
+*.mp4
+*.avi
+*.mov
+*.jpg
+*.jpeg
+*.png
+*.bmp
+*.gif
+*.wav
+*.pkl
+*.npz
+*.h5
+*.pth
+
+# ✅ Model çıktıları
+model_checkpoints/
+runs/
+*.onnx
+
+# ✅ IDE ve sistem dosyaları
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# ✅ Node.js / React
+node_modules/
+build/
+dist/
+frontend/.next/
+frontend/.turbo/
+frontend/.parcel-cache/
+
+# ✅ VSCode debug logs
+*.code-workspace
+*.log
+
+# ✅ Git saklamak istemediğin özel dosyalar (örnek)
+secret_config.json
