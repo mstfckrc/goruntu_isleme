@@ -195,12 +195,12 @@
 
 // export default App;
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import './App.css';
 import axios from 'axios';
 
 function App() {
-  const [aktifSekme, setAktifSekme] = useState<'canli' | 'kayitli'>('canli');
+  const [aktifSekme, setAktifSekme] = useState<'canli' | 'kayitli' | 'duygu'>('canli');
   const [kameraDurumu, setKameraDurumu] = useState<string | null>(null);
   const [videoURL, setVideoURL] = useState('');
   const [videoResults, setVideoResults] = useState<Record<string, number> | null>(null);
@@ -209,6 +209,9 @@ function App() {
   const [sureDoldu, setSureDoldu] = useState(false);
   const [streamUrl, setStreamUrl] = useState<string>("");
   const [videoFilename, setVideoFilename] = useState('');
+  const duyguVideoRef = useRef<HTMLVideoElement>(null);
+  const duyguCanvasRef = useRef<HTMLCanvasElement>(null);
+  const [emotion, setEmotion] = useState<string | null>(null);
 
   // 🔁 Konuşma süresi takibi (her 2 saniyede bir)
   useEffect(() => {
@@ -246,6 +249,12 @@ function App() {
     }
   }, [tracking]);
 
+
+ const stopEmotionStream = () => {
+  const stream = duyguVideoRef.current?.srcObject as MediaStream;
+  stream?.getTracks().forEach(track => track.stop());
+  setEmotion(null);
+};
   // ▶ Takibi başlat
   const handleCanliBaslat = async () => {
     try {
@@ -261,6 +270,46 @@ function App() {
     }
   };
 
+
+  const startEmotionStream = async () => {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+    if (duyguVideoRef.current) {
+      duyguVideoRef.current.srcObject = stream;
+      duyguVideoRef.current.play();
+    }
+  } catch (err) {
+    console.error('Kamera başlatılamadı:', err);
+  }
+};
+
+const predictFromEmotionStream = () => {
+  const canvas = duyguCanvasRef.current;
+  const video = duyguVideoRef.current;
+
+  if (!canvas || !video) return;
+
+  const context = canvas.getContext("2d");
+  if (!context) return;
+
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+  canvas.toBlob(async (blob) => {
+    if (!blob) return;
+
+    const formData = new FormData();
+    formData.append("file", blob, "emotion_frame.jpg");
+
+    try {
+      const res = await axios.post("http://localhost:8000/api/emotion/", formData);
+      setEmotion(res.data.emotion);
+    } catch (err) {
+      console.error("Duygu tahmini hatası:", err);
+    }
+  }, "image/jpeg");
+};
   // ⏹ Takibi durdur
   const handleCanliDurdur = async () => {
     try {
@@ -273,6 +322,46 @@ function App() {
       alert("Durdurulamadı.");
     }
   };
+
+  useEffect(() => {
+  let interval: NodeJS.Timeout;
+  if (tracking) {
+    interval = setInterval(() => {
+      captureAndSendEmotion();
+    }, 2000);
+  }
+  return () => clearInterval(interval);
+}, [tracking]);
+
+  const captureAndSendEmotion = async () => {
+  const video = duyguVideoRef.current;
+  const canvas = duyguCanvasRef.current;
+
+  if (video && canvas) {
+    const ctx = canvas.getContext('2d');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    ctx?.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    canvas.toBlob(async (blob) => {
+      if (!blob) return;
+      const formData = new FormData();
+      formData.append('file', blob, 'frame.jpg');
+
+      try {
+        const res = await fetch('http://localhost:8000/api/emotion/', {
+          method: 'POST',
+          body: formData,
+        });
+
+        const data = await res.json();
+        setEmotion(data.emotion);  // 'happy' ya da 'sad'
+      } catch (err) {
+        console.error('Tahmin hatası:', err);
+      }
+    }, 'image/jpeg');
+  }
+};
 
   // 🎞️ Kayıtlı video analizi
   const handleVideoSubmit = async (e: React.FormEvent) => {
@@ -292,7 +381,7 @@ function App() {
     }
   };
 
-return (
+  return (
   <div className="App">
     <header>
       <h1>🧠 Konuşan Kişi Tanıma Sistemi</h1>
@@ -301,10 +390,11 @@ return (
     <nav>
       <button onClick={() => setAktifSekme('canli')}>🎥 Canlı Video</button>
       <button onClick={() => setAktifSekme('kayitli')}>📽️ Kayıtlı Video (YouTube)</button>
+      <button onClick={() => setAktifSekme('duygu')}>🧠 Duygu Tanıma</button>
     </nav>
 
     <main>
-      {aktifSekme === 'canli' ? (
+      {aktifSekme === 'canli' && (
         <section>
           <h2>📡 Canlı Video Üzerinden Konuşan Tanıma</h2>
           <p>Bu modül canlı kamera akışında konuşan kişiyi tanımlar.</p>
@@ -330,7 +420,9 @@ return (
             ⚠️ Manuel başlatmak istersen: <code>python controller/face/live_speaker_tracker.py</code>
           </p>
         </section>
-      ) : (
+      )}
+
+      {aktifSekme === 'kayitli' && (
         <section>
           <h2>🎞️ Kayıtlı Video Üzerinden Konuşan Tanıma</h2>
           <p>YouTube videosu üzerinden konuşan kişiyi tespit edin.</p>
@@ -361,6 +453,28 @@ return (
         </section>
       )}
 
+      {aktifSekme === 'duygu' && (
+        <section>
+          <h3>🧠 Kamera ile Duygu Tanıma</h3>
+          <video ref={duyguVideoRef} autoPlay muted style={{ width: 400 }} />
+          <canvas ref={duyguCanvasRef} style={{ display: 'none' }} />
+
+          <div style={{ marginTop: 10 }}>
+            <button onClick={startEmotionStream}>📷 Kamerayı Aç (Duygu)</button>
+            <button onClick={captureAndSendEmotion}>🎯 Duygu Tahmini Yap</button>
+            <button onClick={stopEmotionStream} style={{ marginLeft: 10 }}>
+              🔒 Kamerayı Kapat (Duygu)
+            </button>
+          </div>
+
+          {emotion && (
+            <p style={{ marginTop: '10px', fontWeight: 'bold', fontSize: '18px' }}>
+              Tahmin Edilen Duygu: <span style={{ color: emotion === 'happy' ? 'green' : 'red' }}>{emotion}</span>
+            </p>
+          )}
+        </section>
+      )}
+
       {videoResults && (
         <section>
           <h3>🧠 Konuşma Süresi Sonuçları:</h3>
@@ -387,4 +501,3 @@ return (
 );
 }
 export default App;
-

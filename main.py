@@ -61,7 +61,7 @@
 
 
 from collections import defaultdict
-from fastapi import FastAPI
+from fastapi import FastAPI, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
@@ -74,15 +74,19 @@ from controller.video.fix_video import reencode_video
 from controller.video.analyze_recorded_video import analyze_recorded_video
 from fastapi import FastAPI
 from routers import video
+from controller.emotion.emotion_analyzer import predict_emotion_from_bytes
+from routers import video
+from controller.emotion import emotion_analyzer
 
 app = FastAPI()
 
 app.include_router(video.router)
+app.include_router(emotion_analyzer.router)
 
 # 🌐 CORS ayarları (React frontend ile bağlantı için)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Gerekirse sadece ["http://localhost:3000"] yaz
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -127,6 +131,13 @@ def get_live_results():
     except FileNotFoundError:
         return {}
 
+
+
+@app.post("/api/emotion/")
+async def analyze_emotion(file: UploadFile = File(...)):
+    image_bytes = await file.read()
+    emotion = predict_emotion_from_bytes(image_bytes)
+    return {"emotion": emotion}
 
 @app.get("/api/live/status")
 def live_status():
