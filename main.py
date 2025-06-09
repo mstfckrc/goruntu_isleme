@@ -98,20 +98,25 @@ process = None
 @app.post("/api/live/start")
 def start_live_tracker():
     global process
-    if process is None:
-        try:
-            base_dir = os.getcwd()
-            script_path = os.path.join(base_dir, "controller", "face", "live_speaker_tracker.py")
-            process = subprocess.Popen(
-                ["python", script_path],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                cwd=base_dir
-            )
-            return {"status": "started"}
-        except Exception as e:
-            return JSONResponse(status_code=500, content={"status": "error", "detail": str(e)})
-    return {"status": "already_running"}
+
+    # 🔁 Eğer process varsa ama çalışmıyorsa, sıfırla
+    if process is not None:
+        if process.poll() is not None:
+            print("[INFO] Önceki süreç kapanmıştı. Yeni süreç başlatılıyor.")
+            process = None
+        else:
+            return {"status": "already_running"}
+
+    try:
+        base_dir = os.getcwd()
+        script_path = os.path.join(base_dir, "controller", "face", "live_speaker_tracker.py")
+        
+        # 🎬 Yeni süreç başlat
+        process = subprocess.Popen(["python", script_path], cwd=base_dir)
+        print("[INFO] Yeni süreç başlatıldı.")
+        return {"status": "started"}
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"status": "error", "detail": str(e)})
 
 @app.post("/api/live/stop")
 def stop_live_tracker():
@@ -119,6 +124,15 @@ def stop_live_tracker():
     if process:
         process.terminate()
         process = None
+
+        # ✅ Sayaç dosyasını da temizle
+        try:
+            if os.path.exists("results.json"):
+                os.remove("results.json")
+                print("[INFO] results.json dosyası silindi.")
+        except Exception as e:
+            print(f"[HATA] results.json silinemedi: {e}")
+
         return {"status": "stopped"}
     return {"status": "not_running"}
 
@@ -290,8 +304,11 @@ def video_feed():
 
 @app.get("/api/live/results")
 def get_results():
-    global speaking_times
-    return {name: round(s, 2) for name, s in speaking_times.items()}
+    try:
+        with open("results.json", "r") as f:
+            return json.load(f)
+    except:
+        return {}
 
 @app.get("/")
 def index():
